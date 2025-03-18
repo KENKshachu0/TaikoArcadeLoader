@@ -12,12 +12,13 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_WINDOWS_UTF8
 #include "stb_image.h"
+#include "config.h"
 
 extern GameVersion gameVersion;
 extern std::vector<HMODULE> plugins;
-extern bool acceptInvalidCards;
-extern bool emulateCardReader;
-extern bool emulateQr;
+static bool acceptInvalidCards = Config::ConfigManager::instance ().getEmulationConfig ().accept_invalid;
+static bool emulateCardReader = Config::ConfigManager::instance ().getEmulationConfig ().card_reader;
+static bool emulateQr = Config::ConfigManager::instance ().getEmulationConfig ().qr;
 extern char accessCode1[21];
 extern char accessCode2[21];
 extern char chipId1[33];
@@ -188,19 +189,19 @@ namespace Card {
         return 1;
     }
 
-    HOOK (i64, bngrw_ReqCancelOfficial, PROC_ADDRESS ("bngrw.dll", "BngRwReqCancel"), u32 a1) {
+    FAST_HOOK (i64, bngrw_ReqCancelOfficial, PROC_ADDRESS ("bngrw.dll", "BngRwReqCancel"), u32 a1) {
         if (state != State::Disable) {
             state = State::Disable;
             patches::Plugins::UpdateStatus (StatusType::CardStatus, false);
         }
-        return originalbngrw_ReqCancelOfficial (a1);
+        return originalbngrw_ReqCancelOfficial.fastcall<i64> (a1);
     }
-    HOOK (u64, bngrw_ReqWaitTouchOfficial, PROC_ADDRESS ("bngrw.dll", "BngRwReqWaitTouch"), u32 a1, i32 a2, u32 a3, CallbackTouch callback, u64 a5) {
+    FAST_HOOK (u64, bngrw_ReqWaitTouchOfficial, PROC_ADDRESS ("bngrw.dll", "BngRwReqWaitTouch"), u32 a1, i32 a2, u32 a3, CallbackTouch callback, u64 a5) {
         state = State::Ready;
         patches::Plugins::UpdateStatus (StatusType::CardStatus, true);
         callbackTouch = callback;
         touchData = a5;
-        return originalbngrw_ReqWaitTouchOfficial (a1, a2, a3, Internal::AgentCallbackTouchOfficial, a5);
+        return originalbngrw_ReqWaitTouchOfficial.fastcall<u64> (a1, a2, a3, Internal::AgentCallbackTouchOfficial, a5);
     }
 
     bool
@@ -233,15 +234,16 @@ namespace Card {
 
     void
     Init() {
-        LogMessage (LogLevel::INFO, "Init Card patches");
+        LogMessage (LogLevel::DEBUG, "Init Card patches");
         if (!emulateCardReader) {
-            LogMessage (LogLevel::WARN, "[Card] Card reader emulation disabled!");
-            INSTALL_HOOK (bngrw_ReqCancelOfficial);
-            INSTALL_HOOK (bngrw_ReqWaitTouchOfficial);
+            LogMessage (LogLevel::WARN, "Disable Card Reader Emulation");
+            INSTALL_FAST_HOOK (bngrw_ReqCancelOfficial);
+            INSTALL_FAST_HOOK (bngrw_ReqWaitTouchOfficial);
             // patches::Plugins::InitCardReader (patches::Scanner::Card::Commit);
             return;
         }
 
+        LogMessage (LogLevel::INFO, "Using Card Reader Emulation");
         INSTALL_FAST_HOOK (bngrw_Init)
         INSTALL_FAST_HOOK (bngrw_Fin);
         INSTALL_FAST_HOOK (bngrw_IsCmdExec);
@@ -294,7 +296,6 @@ namespace Qr {
     FAST_HOOK_DYNAMIC (bool, Send3, i64, char) { return true; }
     FAST_HOOK_DYNAMIC (bool, Send4, i64, const void *, i64) { return true; }
     FAST_HOOK_DYNAMIC (i64, CopyData, i64, void *dest, int length) {
-        patches::Plugins::UsingQr ();
         lastScan = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now ().time_since_epoch ()).count ();
         if (state == State::CopyWait && scanQueue.size () > 0) {
             std::vector<uint8_t> *data = scanQueue.front ();
@@ -367,41 +368,18 @@ namespace Qr {
             if ((lastScan + 200) < std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now ().time_since_epoch ()).count ()) {
                 state = State::Disable;
                 patches::Plugins::UpdateStatus (StatusType::QrStatus, false);
-            } else {
-                void *plugin = patches::Plugins::CheckQr ();
-                if (plugin) {
-                    uint8_t *space = (uint8_t *)calloc (600, sizeof (uint8_t));
-                    size_t size = patches::Plugins::GetQr (plugin, 600, space);
-                    if (size > 0) {
-                        std::vector<uint8_t> data = {};
-                        for (size_t i = 0; i < size; i ++) data.push_back (space[i]);
-                        patches::Scanner::Qr::Commit (data);
-                    }
-                }
             }
         }
     }
 
     std::vector<uint8_t> &
     ReadQRData (std::vector<uint8_t> &buffer) {
-        std::string serial = "";
-        u16 type           = 0;
-        std::vector<i64> songNoes;
+        std::string serial = Config::ConfigManager::instance ().getQrConfig ().data.serial;
+        u16 type           = Config::ConfigManager::instance ().getQrConfig ().data.type;
+        std::vector<int> songNoes = Config::ConfigManager::instance ().getQrConfig ().data.song_no;
 
         buffer.clear ();
-        auto configPath = std::filesystem::current_path () / "config.toml";
-        std::unique_ptr<toml_table_t, void (*) (toml_table_t *)> config_ptr (openConfig (configPath), toml_free);
-        if (config_ptr) {
-            auto qr = openConfigSection (config_ptr.get (), "qr");
-            if (qr) {
-                auto data = openConfigSection (qr, "data");
-                if (data) {
-                    serial   = readConfigString (data, "serial", "");
-                    type     = (u16) readConfigInt (data, "type", 0);
-                    songNoes = readConfigIntArray (data, "song_no", songNoes);
-                }
-            }
-        }
+
         std::vector<uint8_t> header = { 0x53, 0x31, 0x32, 0x00, 0x00, 0xFF, 0xFF, (uint8_t)serial.size (), 0x01, 0x00 };
         for (uint8_t byte_data : header) buffer.push_back (byte_data);
         for (char word : serial)         buffer.push_back ((uint8_t)word);
@@ -420,18 +398,12 @@ namespace Qr {
 
     std::vector<uint8_t> &
     ReadQRImage (std::vector<uint8_t> &buffer) {
-        std::string imagePath = "";
+        std::string imagePath = Config::ConfigManager::instance ().getQrConfig ().image_path;
 
         buffer.clear ();
-        auto configPath = std::filesystem::current_path () / "config.toml";
-        std::unique_ptr<toml_table_t, void (*) (toml_table_t *)> config_ptr (openConfig (configPath), toml_free);
-        if (config_ptr) {
-            auto qr = openConfigSection (config_ptr.get (), "qr");
-            if (qr) imagePath = readConfigString (qr, "image_path", "");
-        }
         std::u8string u8PathStr (imagePath.begin (), imagePath.end ());
         std::filesystem::path u8Path (u8PathStr);
-        if (!std::filesystem::is_regular_file (u8Path)) {
+        if (!is_regular_file (u8Path)) {
             LogMessage (LogLevel::ERROR, "Failed to open image: {} (file not found)", u8Path.string());
             return buffer;
         }
@@ -453,13 +425,14 @@ namespace Qr {
 
     void
     Init () {
-        LogMessage (LogLevel::INFO, "Init Qr patches");
+        LogMessage (LogLevel::DEBUG, "Init Qr patches");
 
         if (!emulateQr) {
-            LogMessage (LogLevel::WARN, "[QR] QR emulation disabled!");
+            LogMessage (LogLevel::WARN, "Disable QR Scanner Emulation");
             return;
         }
-        patches::Plugins::InitQr (gameVersion);
+
+        LogMessage (LogLevel::INFO, "Using QR Scanner Emulation");
         SetConsoleOutputCP (CP_UTF8);
         auto amHandle = reinterpret_cast<u64> (GetModuleHandle ("AMFrameWork.dll"));
         switch (gameVersion) {
@@ -528,7 +501,7 @@ Update() {
 
 void
 Init() {
-    LogMessage (LogLevel::INFO, "Init Scanner patches");
+    LogMessage (LogLevel::DEBUG, "Init Scanner patches");
     patches::Scanner::Card::Init ();
     patches::Scanner::Qr::Init ();
 }

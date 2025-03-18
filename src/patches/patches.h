@@ -89,11 +89,6 @@ void Update         ();
 void Exit           ();
 // Lowlevel Card API
 void WaitTouch      (CallBackTouchCard callback, uint64_t touchData);
-// Lowlevel QR API
-void   InitQr       (GameVersion gameVersion);
-void   UsingQr      ();
-void * CheckQr      ();
-size_t GetQr        (void *plugin, size_t size, uint8_t *buffer);
 // New API
 void InitVersion    (GameVersion gameVersion);
 void InitCardReader (CommitCardCallback touch);

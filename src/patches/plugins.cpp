@@ -39,42 +39,13 @@ namespace patches::Plugins {
             if (event) ((BasicEvent)event) ();
         }
     }
-    // Card API
+    // Low Level Card API
     void
     WaitTouch (CallBackTouchCard callback, uint64_t touchData) {
         for (auto plugin : plugins) {
             auto event = GetProcAddress (plugin, "WaitTouch");
             if (event) ((WaitTouchEvent)event) (callback, touchData);
         }
-    }
-    // QR API (deprecated)
-    void
-    InitQr (GameVersion gameVersion) {
-        for (auto plugin : plugins) {
-            auto event = GetProcAddress (plugin, "InitQr");
-            if (event) ((SendVersionEvent)event) (gameVersion);
-        }
-    }
-    void
-    UsingQr () {
-        for (auto plugin : plugins) {
-            auto event = GetProcAddress (plugin, "UsingQr");
-            if (event) ((BasicEvent)event) ();
-        }
-    }
-    void *
-    CheckQr () {
-        for (auto plugin : plugins) {
-            auto event = GetProcAddress (plugin, "UsingQr");
-            if (event && ((CheckEvent)event) ()) return plugin;
-        }
-        return nullptr;
-    }
-    size_t
-    GetQr (void *plugin, size_t size, uint8_t *buffer) {
-        auto event = GetProcAddress (*(HMODULE *)plugin, "GetQr");
-        if (event) return ((CopyDataEvent)event) (size, buffer);
-        else return 0;
     }
     // New API
     void
@@ -124,10 +95,10 @@ namespace patches::Plugins {
                     auto name      = entry.path ().wstring ();
                     auto shortName = entry.path ().filename ().wstring ();
                     if (HMODULE hModule = LoadLibraryW (name.c_str ()); !hModule) {
-                        LogMessage (LogLevel::ERROR, L"Failed to load plugin " + shortName);
+                        LogMessage (LogLevel::ERROR, L"Failed to load plugin: {}", shortName);
                     } else {
                         plugins.push_back (hModule);
-                        LogMessage (LogLevel::INFO, L"Loaded plugin " + shortName);
+                        LogMessage (LogLevel::INFO, L"Using plugin: {}", shortName);
                     }
                 }
             }
@@ -146,8 +117,4 @@ namespace patches::Plugins {
             }
         }).detach ();
     }
-
-
-
-
 }

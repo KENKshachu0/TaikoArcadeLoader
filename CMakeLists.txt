@@ -7,6 +7,20 @@ if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE INTERNAL "")
 endif()
 
+find_package(Git REQUIRED)
+
+# Commands to read each needed variable
+set(variablesToRead "GIT_BRANCH;GIT_SHA1;GIT_SHORTSHA1;GIT_DIRTY")
+set(CMD_GIT_VERSION     ${GIT_EXECUTABLE} describe --tags --dirty)
+
+execute_process(
+    COMMAND ${CMD_GIT_VERSION}
+    RESULT_VARIABLE GIT_VERSION_RESULT
+    OUTPUT_VARIABLE GIT_VERSION
+    ERROR_VARIABLE GIT_ERROR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
 # Set C and C++ standards
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 23)
@@ -24,23 +38,12 @@ endif()
 
 # Add project definitions (Add ASYNC_UPDATE/ASYNC_IO to enable new async feature [experimental])
 # add_definitions(-DNOMINMAX -DLTC_NO_PROTOTYPES -D_CRT_SECURE_NO_WARNINGS -DASYNC_UPDATE)
-add_definitions(-DNOMINMAX -DLTC_NO_PROTOTYPES -D_CRT_SECURE_NO_WARNINGS)
+add_definitions(-DNOMINMAX -DLTC_NO_PROTOTYPES -D_CRT_SECURE_NO_WARNINGS -DTAL_VERSION="${GIT_VERSION}")
+MESSAGE( STATUS "Build Version = ${GIT_VERSION}.")
+
 
 # Include FetchContent module
 include(FetchContent)
-
-# Fetch tomlc99 (no built-in CMake support)
-FetchContent_Declare(
-    tomlc99
-    GIT_REPOSITORY https://github.com/cktan/tomlc99.git
-    GIT_TAG master
-)
-FetchContent_GetProperties(tomlc99)
-if(NOT tomlc99_POPULATED)
-    FetchContent_MakeAvailable(tomlc99)
-    add_library(tomlc99 STATIC ${tomlc99_SOURCE_DIR}/toml.c)
-    target_include_directories(tomlc99 PUBLIC ${tomlc99_SOURCE_DIR})
-endif()
 
 # Fetch stb (header-only library, no built-in CMake support)
 FetchContent_Declare(
@@ -130,48 +133,94 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(minhook)
 
+FetchContent_Declare(
+        tomlplusplus
+        GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
+        GIT_TAG v3.4.0
+)
+FetchContent_MakeAvailable(tomlplusplus)
+export(TARGETS tomlplusplus_tomlplusplus  FILE "${CMAKE_BINARY_DIR}/tomlplusplus-config.cmake")
+set(tomlplusplus_DIR "${CMAKE_BINARY_DIR}")
+
+FetchContent_Declare(
+        reflectcpp
+        URL https://github.com/getml/reflect-cpp/archive/refs/tags/v0.17.0.zip
+)
+set(REFLECTCPP_TOML ON CACHE BOOL "" FORCE)
+set(REFLECTCPP_XML OFF CACHE BOOL "" FORCE)
+set(REFLECTCPP_USE_VCPKG OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(reflectcpp)
+
 # Source files
 set(SOURCES
-    src/dllmain.cpp
-    src/helpers.cpp
-    src/logger.cpp
-    src/poll.cpp
-    src/pollasync.cpp
-    src/bnusio.cpp
-    src/Windows/WindowsError.cpp
-    src/Windows/MinimumLatencyAudioClient.cpp
-    src/patches/amauth.cpp
-    # src/patches/dxgi.cpp
-    # src/patches/fpslimiter.cpp
-    src/patches/audio.cpp
-    src/patches/plugins.cpp
-    src/patches/scanner.cpp
-    src/patches/layeredfs.cpp
-    src/patches/testmode.cpp
-    src/patches/timer.cpp
-    src/patches/language.cpp
-    # src/patches/unlimitsong.cpp
-    src/patches/versions/JPN00.cpp
-    src/patches/versions/JPN08.cpp
-    src/patches/versions/JPN39.cpp
-    src/patches/versions/CHN00.cpp
+        src/dllmain.cpp
+        src/helpers.cpp
+        src/logger.cpp
+        src/poll.cpp
+        src/pollasync.cpp
+        src/bnusio.cpp
+        src/Windows/WindowsError.cpp
+        src/Windows/MinimumLatencyAudioClient.cpp
+        src/patches/amauth.cpp
+        # src/patches/dxgi.cpp
+        # src/patches/fpslimiter.cpp
+        src/patches/audio.cpp
+        src/patches/plugins.cpp
+        src/patches/scanner.cpp
+        src/patches/layeredfs.cpp
+        src/patches/testmode.cpp
+        src/patches/timer.cpp
+        src/patches/language.cpp
+        # src/patches/unlimitsong.cpp
+        src/patches/versions/JPN00.cpp
+        src/patches/versions/JPN08.cpp
+        src/patches/versions/JPN39.cpp
+        src/patches/versions/CHN00.cpp
+        src/config.cpp
+        src/banner.cpp
+)
+
+set(VALIDATOR_SOURCES
+        src/configValidator.cpp
+        src/helpers.cpp
+        src/config.cpp
+        src/logger.cpp
 )
 
 # Create the library
 add_library(bnusio SHARED ${SOURCES})
+add_executable(validator ${VALIDATOR_SOURCES})
 
-# Remove 'lib' prefix from the library name
-set_target_properties(bnusio PROPERTIES PREFIX "")
+# Remove 'lib' prefix from the library name, make sure the output directory is expected
+set_target_properties(bnusio PROPERTIES
+        PREFIX ""
+	LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+
+set_target_properties(validator PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+)
+
 
 # Include directories
 target_include_directories(bnusio PRIVATE
-    src
-    ${tomlc99_SOURCE_DIR}
-    ${SDL3_SOURCE_DIR}/include
-    ${xxhash_SOURCE_DIR}
-    ${zlib_SOURCE_DIR}
-    ${libtomcrypt_SOURCE_DIR}/src/headers
-    ${minhook_SOURCE_DIR}/include
+        src
+        ${SDL3_SOURCE_DIR}/include
+        ${xxhash_SOURCE_DIR}
+        ${zlib_SOURCE_DIR}
+        ${libtomcrypt_SOURCE_DIR}/src/headers
+        ${minhook_SOURCE_DIR}/include
+        ${reflectcpp_SOURCE_DIR}/include
+)
+
+target_include_directories(validator PRIVATE
+        src
+        ${SDL3_SOURCE_DIR}/include
+        ${xxhash_SOURCE_DIR}
+        ${zlib_SOURCE_DIR}
+        ${libtomcrypt_SOURCE_DIR}/src/headers
+        ${minhook_SOURCE_DIR}/include
+        ${reflectcpp_SOURCE_DIR}/include
 )
 
 # Compiler definitions
@@ -186,18 +235,35 @@ endif()
 
 # Link libraries
 target_link_libraries(bnusio PRIVATE
-    tomlc99
-    SDL3-static
-    xxhash
-    zlibstatic
-    libtomcrypt
-    safetyhook
-    ZXing::ZXing
-    pugixml
-    stb
-    ws2_32
-    ntdll
-    minhook
+        SDL3-static
+        xxhash
+        zlibstatic
+        libtomcrypt
+        safetyhook
+        ZXing::ZXing
+        pugixml
+        stb
+        ws2_32
+        ntdll
+        minhook
+        tomlplusplus::tomlplusplus
+        reflectcpp
+)
+
+target_link_libraries(validator PRIVATE
+        SDL3-static
+        xxhash
+        zlibstatic
+        libtomcrypt
+        safetyhook
+        ZXing::ZXing
+        pugixml
+        stb
+        ws2_32
+        ntdll
+        minhook
+        tomlplusplus::tomlplusplus
+        reflectcpp
 )
 
 # Define log path; used to make the file path relative in the log calls.
@@ -220,7 +286,7 @@ endif()
 add_custom_command(
     TARGET bnusio POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/bnusio.dll"
+        "${CMAKE_BINARY_DIR}/$<CONFIG>/bnusio.dll"
         "${CMAKE_SOURCE_DIR}/dist/bnusio.dll"
     COMMENT "Copying bnusio.dll to dist directory"
 )

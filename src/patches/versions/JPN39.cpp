@@ -2,11 +2,12 @@
 #include "helpers.h"
 #include "../patches.h"
 #include <map>
+#include "config.h"
 
-extern i32 xRes;
-extern i32 yRes;
-extern bool vsync;
-extern bool localFiles;
+static const i32& xRes = Config::ConfigManager::instance ().getGraphicsConfig ().res.x;
+static const i32& yRes = Config::ConfigManager::instance ().getGraphicsConfig ().res.y;
+static bool vsync = Config::ConfigManager::instance ().getGraphicsConfig ().vsync;
+static bool localFiles = Config::ConfigManager::instance ().getPatchesConfig ().local_files;
 
 namespace patches::JPN39 {
 int language = 0;
@@ -313,8 +314,8 @@ uint8_t *datatableBuffer[3] = { nullptr };
 std::vector<SafetyHookMid> datatable_patch = {};
 #define DATATABLE_PATCH_REGISTER(location, reg, value, skip) { datatable_patch.push_back(safetyhook::create_mid(location, [](SafetyHookContext &ctx) {ctx.reg = (uintptr_t)(value); ctx.rip = location + skip;})); }
 void
-ReplaceDatatableBufferAddresses () {
-    LogMessage (LogLevel::INFO, "Set Datatable Size to 12MB");
+PatchDatatable () {
+    LogMessage (LogLevel::INFO, "Using Datatable patch size: 12MB");
     for (int i = 0; i < 3; i ++) datatableBuffer[i] = (uint8_t *)malloc (datatableBufferSize);
     DATATABLE_PATCH_REGISTER (ASLR (0x1400ABE26), r8, datatableBufferSize, 6);
     DATATABLE_PATCH_REGISTER (ASLR (0x1400ABE3A), r8, datatableBufferSize, 6);
@@ -333,20 +334,9 @@ ReplaceDatatableBufferAddresses () {
 
 void
 Init () {
-    LogMessage (LogLevel::INFO, "Init JPN39 patches");
-    bool unlockSongs  = true;
-    double modelResRate = 1.0;
-
-    auto configPath = std::filesystem::current_path () / "config.toml";
-    std::unique_ptr<toml_table_t, void (*) (toml_table_t *)> config_ptr (openConfig (configPath), toml_free);
-    if (config_ptr) {
-        if (auto patches = openConfigSection (config_ptr.get (), "patches")) {
-            unlockSongs = readConfigBool (patches, "unlock_songs", unlockSongs);
-        }
-        if (auto graphics = openConfigSection (config_ptr.get (), "graphics")) {
-            modelResRate = readConfigDouble (graphics, "model_res_rate", modelResRate);
-        }
-    }
+    LogMessage (LogLevel::DEBUG, "Init JPN39 patches");
+    bool unlockSongs  = Config::ConfigManager::instance ().getPatchesConfig ().unlock_songs;
+    double modelResRate = Config::ConfigManager::instance ().getGraphicsConfig ().model_res_rate;
 
     // Hook to get AppAccessor and ComponentAccessor
     INSTALL_FAST_HOOK (DeviceCheck);
@@ -360,7 +350,7 @@ Init () {
     if (modelResRate > 0) {
         i32 donModelX = (i32)(xRes * modelResRate);
         i32 donModelY = (i32)(yRes * modelResRate);
-        LogMessage (LogLevel::INFO, "Patch DonModel use resolution {}x{}", donModelX, donModelY);
+        LogMessage (LogLevel::INFO, "Using DonModel Resolutin: {}x{}", donModelX, donModelY);
         WRITE_MEMORY (ASLR (0x1404F3D5B), i32, donModelX);
         WRITE_MEMORY (ASLR (0x1404F3D62), i32, donModelY);
     }
@@ -374,7 +364,7 @@ Init () {
     WRITE_MEMORY (ASLR (0x140580459), u8, 0x10);
 
     // Remove datatable size limit
-    ReplaceDatatableBufferAddresses ();
+    PatchDatatable ();
 
     // Unlock Songs
     TestMode::RegisterItem (

@@ -2,8 +2,10 @@
 #include "helpers.h"
 #include <tomcrypt.h>
 #include <zlib.h>
+#include "config.h"
 
-bool useLayeredFs = false;
+bool        useLayeredFs = Config::ConfigManager::instance ().getLayeredFsConfig ().enabled;
+std::string modDir       = Config::ConfigManager::instance ().getLayeredFsConfig ().mod_dir;
 
 std::string datatableKey = "3530304242323633353537423431384139353134383346433246464231354534";
 std::string fumenKey     = "4434423946383537303842433443383030333843444132343339373531353830";
@@ -179,8 +181,8 @@ LayeredFsHandler (const std::string &originalFileName, const std::string &curren
     std::filesystem::path path (originalFileName.c_str ());
     if (!path.is_absolute ()) path = absolute (path);
     auto originalDataFolder       = std::filesystem::current_path ().parent_path ().parent_path () / "Data" / "x64";
-    auto originalLayeredFsFolder  = std::filesystem::current_path ().parent_path ().parent_path () / "Data_mods" / "x64";
-    auto encryptedLayeredFsFolder = std::filesystem::current_path ().parent_path ().parent_path () / "Data_mods" / "x64_enc";
+    auto originalLayeredFsFolder  = std::filesystem::current_path ().parent_path ().parent_path () / modDir / "x64";
+    auto encryptedLayeredFsFolder = std::filesystem::current_path ().parent_path ().parent_path () / modDir / "x64_enc";
 
     if (path.string ().find (originalDataFolder.string ()) == 0) {
         auto newPath = path.string ();
@@ -285,29 +287,24 @@ FAST_HOOK (HANDLE, CreateFileAHook, PROC_ADDRESS ("kernel32.dll", "CreateFileA")
 
 void
 Init () {
-    const auto configPath = std::filesystem::current_path () / "config.toml";
-    const std::unique_ptr<toml_table_t, void (*) (toml_table_t *)> config_ptr (openConfig (configPath), toml_free);
-    if (config_ptr) {
-        if (const auto layeredFs = openConfigSection (config_ptr.get (), "layeredfs"))
-            useLayeredFs = readConfigBool (layeredFs, "enabled", useLayeredFs);
-    }
     register_cipher (&aes_desc);
     if (useLayeredFs || !beforeHandlers.empty () || !afterHandlers.empty ()) {
-        LogMessage (LogLevel::INFO, "using LayeredFs! Data_mods={} beforHandlers={} afterHandlers={}",
-            useLayeredFs ? "enabled" : "disabled", beforeHandlers.size (), afterHandlers.size ());
+        if (!beforeHandlers.empty ()) LogMessage (LogLevel::INFO, "Using fileHandler beofre size: {}", beforeHandlers.size ());
+        if (useLayeredFs) LogMessage (LogLevel::INFO, "Using LayeredFS mods folder: ", modDir);
+        if (!afterHandlers.empty ()) LogMessage (LogLevel::INFO, "Using fileHandler after size: {}", afterHandlers.size ());
         INSTALL_FAST_HOOK (CreateFileAHook);
     }
 }
 
 void
 RegisterBefore (const std::function<std::string (std::string, std::string)> &fileHandler) {
-    LogMessage (LogLevel::DEBUG, "Registered Before");
+    LogMessage (LogLevel::DEBUG, "Registered LayeredFS Before Handler");
     beforeHandlers.push_back (new RegisteredHandler (fileHandler));
 }
 
 void
 RegisterAfter (const std::function<std::string (std::string, std::string)> &fileHandler) {
-    LogMessage (LogLevel::DEBUG, "Registered After");
+    LogMessage (LogLevel::DEBUG, "Registered LayeredFS After Handler");
     afterHandlers.push_back (new RegisteredHandler (fileHandler));
 }
 

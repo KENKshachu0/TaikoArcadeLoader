@@ -1,7 +1,8 @@
 #include "constants.h"
 #include "helpers.h"
 #include "patches.h"
-#include <emmintrin.h>
+#include <map>
+
 
 extern GameVersion gameVersion;
 
@@ -110,7 +111,7 @@ Init () {
         fontExistAll = false;
     }
     if (fontExistAll == false) return;
-    LogMessage (LogLevel::INFO, "Detected cn_xx files, Install Font patches");
+    LogMessage (LogLevel::INFO, "Using Font patches (Detected cn_xx files)");
     languageData = calloc (languages.size () * languages.size () * 0x70 * 0x5, sizeof (u8));
 
     switch (gameVersion) {
@@ -388,14 +389,14 @@ Init () {
             demoMovieExistAll = false;
         }
         if (demoMovieExistAll) {
-            LogMessage (LogLevel::INFO, "Detected attractdemo_cn files, install attractdemo patches!");
+            LogMessage (LogLevel::INFO, "Using Attractdemo patches (Detected attractdemo_cn files)");
             INSTALL_FAST_HOOK_DYNAMIC (LoadDemoMovie, ASLR (0x1404313F0));
         }
 
         bool onpCnExist = false;
         if (std::filesystem::exists (std::string ("..\\..\\Data\\x64\\textures\\onpu_cn\\onp_all.nutexb"))) onpCnExist = true;
         if (onpCnExist) {
-            LogMessage (LogLevel::INFO, "Detected onpu_cn files, install onp patches!");
+            LogMessage (LogLevel::INFO, "Using Onp patches (Detected onpu_cn files)");
             INSTALL_MID_HOOK_DYNAMIC (ChangeOnpFile, ASLR (0x140134D16));
         }
         language_patch.push_back (safetyhook::create_mid (ASLR (0x140134E22), [](SafetyHookContext &ctx){
@@ -637,7 +638,7 @@ Init () {
         };
         for (std::string voiceFile : voiceFiles) checkVoiceFile (("..\\..\\Data\\x64\\sound\\" + voiceFile).c_str ());
         if (enableSwitchVoice) {
-            LogMessage (LogLevel::INFO, "Detected voice files, install voice patches!");
+            LogMessage (LogLevel::INFO, "Using Voice patches (Detected voice files)");
             TestMode::RegisterItemAfter(
                 L"/root/menu[@id='OthersMenu']/layout[@type='Center']/select-item[@id='LanguageItem']",
                 L"<select-item label=\"VOICE\" param-offset-x=\"35\" replace-text=\"0:JPN, 1:CHN\" group=\"Setting\" "

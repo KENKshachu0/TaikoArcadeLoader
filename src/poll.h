@@ -1,5 +1,6 @@
 #pragma once
 #include <SDL3/SDL.h>
+#include <array>
 #include "helpers.h"
 #include "bnusio.h"
 
@@ -9,8 +10,8 @@
 
 // #define ASYNC_IO
 
-enum SDLAxis {
-    SDL_AXIS_NULL,
+enum class SDLAxis {
+    SDL_AXIS_NULL = 0,
     SDL_AXIS_LEFT_LEFT,
     SDL_AXIS_LEFT_RIGHT,
     SDL_AXIS_LEFT_UP,
@@ -37,16 +38,16 @@ struct SDLAxisState {
     float RTriggerDown;
 };
 
-enum Scroll { MOUSE_SCROLL_INVALID, MOUSE_SCROLL_UP, MOUSE_SCROLL_DOWN };
+enum class Scroll { MOUSE_SCROLL_INVALID = 0, MOUSE_SCROLL_UP, MOUSE_SCROLL_DOWN };
 
 struct Keybindings {
-    u8 keycodes[255] = { '\0' };
-    SDL_GamepadButton buttons[255] = { SDL_GAMEPAD_BUTTON_INVALID };
-    SDLAxis axis[255] = { SDL_AXIS_NULL };
-    Scroll scroll[2] = { MOUSE_SCROLL_INVALID };
+    std::array<u8, 255> keycodes = { };
+    std::array<SDL_GamepadButton, 255> buttons = { SDL_GAMEPAD_BUTTON_INVALID };
+    std::array<SDLAxis, 255> axis = {SDLAxis::SDL_AXIS_NULL };
+    std::array<Scroll,2> scroll = {Scroll::MOUSE_SCROLL_INVALID };
 };
 
-enum EnumType { none, keycode, button, axis, scroll };
+enum class EnumType { none, keycode, button, axis, scroll };
 
 struct ConfigValue {
     EnumType type;
@@ -64,11 +65,20 @@ struct InternalButtonState {
     bool Tapped;
 };
 
+struct KeyCodePair {
+    std::string string;
+    u8 keycode;
+};
+
+struct MouseState {
+    POINT Position;
+    POINT RelativePosition;
+    bool ScrolledUp;
+    bool ScrolledDown;
+} inline currentMouseState, lastMouseState;
+
 bool InitializePoll (HWND windowHandle);
 void DisposePoll ();
-void SetKeyboardButtons ();
-ConfigValue StringToConfigEnum (const char *value);
-void SetConfigValue (const toml_table_t *table, const char *key, Keybindings *keybind, u8 *inputState);
 InternalButtonState GetInternalButtonState (const Keybindings &bindings);
 void SetRumble (int left, int right, int length);
 

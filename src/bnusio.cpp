@@ -1,9 +1,11 @@
+// ReSharper disable CppDFAUnreachableCode
 #include <queue>
 #include "constants.h"
 #include "helpers.h"
 #include "patches/patches.h"
 #include "bnusio.h"
 #include "poll.h"
+#include "config.h"
 
 extern GameVersion gameVersion;
 extern std::vector<HMODULE> plugins;
@@ -14,29 +16,29 @@ extern char accessCode2[21];
 extern char chipId1[33];
 extern char chipId2[33];
 
-extern bool emulateUsio;
-extern bool acceptInvalidCards;
+static bool emulateUsio = Config::ConfigManager::instance ().getEmulationConfig ().usio;
+static bool acceptInvalidCards = Config::ConfigManager::instance ().getEmulationConfig ().accept_invalid;
 extern HWND hGameWnd;
 
-Keybindings EXIT          = {.keycodes = {VK_ESCAPE}};
-Keybindings TEST          = {.keycodes = {VK_F1}};
-Keybindings SERVICE       = {.keycodes = {VK_F2}};
-Keybindings DEBUG_UP      = {.keycodes = {VK_UP}};
-Keybindings DEBUG_DOWN    = {.keycodes = {VK_DOWN}};
-Keybindings DEBUG_ENTER   = {.keycodes = {VK_RETURN}};
-Keybindings COIN_ADD      = {.keycodes = {VK_RETURN}, .buttons = {SDL_GAMEPAD_BUTTON_START}};
-Keybindings CARD_INSERT_1 = {.keycodes = {'P'}};
-Keybindings CARD_INSERT_2 = {};
-Keybindings QR_DATA_READ  = {.keycodes = {'Q'}};
-Keybindings QR_IMAGE_READ = {.keycodes = {'W'}};
-Keybindings P1_LEFT_BLUE  = {.keycodes = {'D'}, .axis = {SDL_AXIS_LEFT_DOWN}};
-Keybindings P1_LEFT_RED   = {.keycodes = {'F'}, .axis = {SDL_AXIS_LEFT_RIGHT}};
-Keybindings P1_RIGHT_RED  = {.keycodes = {'J'}, .axis = {SDL_AXIS_RIGHT_RIGHT}};
-Keybindings P1_RIGHT_BLUE = {.keycodes = {'K'}, .axis = {SDL_AXIS_RIGHT_DOWN}};
-Keybindings P2_LEFT_BLUE  = {.keycodes = {'Z'}};
-Keybindings P2_LEFT_RED   = {.keycodes = {'X'}};
-Keybindings P2_RIGHT_RED  = {.keycodes = {'C'}};
-Keybindings P2_RIGHT_BLUE = {.keycodes = {'V'}};
+static const Keybindings & EXIT          = Config::ConfigManager::instance ().getKeyBindings ().exit();
+static const Keybindings & TEST          = Config::ConfigManager::instance ().getKeyBindings ().test();
+static const Keybindings & SERVICE       = Config::ConfigManager::instance ().getKeyBindings ().service();
+static const Keybindings & DEBUG_UP      = Config::ConfigManager::instance ().getKeyBindings ().debug_up();
+static const Keybindings & DEBUG_DOWN    = Config::ConfigManager::instance ().getKeyBindings ().debug_down();
+static const Keybindings & DEBUG_ENTER   = Config::ConfigManager::instance ().getKeyBindings ().debug_enter();
+static const Keybindings & COIN_ADD      = Config::ConfigManager::instance ().getKeyBindings ().coin_add();
+static const Keybindings & CARD_INSERT_1 = Config::ConfigManager::instance ().getKeyBindings ().card_insert_1();
+static const Keybindings & CARD_INSERT_2 = Config::ConfigManager::instance ().getKeyBindings ().card_insert_2();
+static const Keybindings & QR_DATA_READ  = Config::ConfigManager::instance ().getKeyBindings ().qr_data_read();
+static const Keybindings & QR_IMAGE_READ = Config::ConfigManager::instance ().getKeyBindings ().qr_image_read();
+static const Keybindings & P1_LEFT_BLUE  = Config::ConfigManager::instance ().getKeyBindings ().p1_left_blue();
+static const Keybindings & P1_LEFT_RED   = Config::ConfigManager::instance ().getKeyBindings ().p1_left_red();
+static const Keybindings & P1_RIGHT_RED  = Config::ConfigManager::instance ().getKeyBindings ().p1_right_red();
+static const Keybindings & P1_RIGHT_BLUE = Config::ConfigManager::instance ().getKeyBindings ().p1_right_blue();
+static const Keybindings & P2_LEFT_BLUE  = Config::ConfigManager::instance ().getKeyBindings ().p2_left_blue();
+static const Keybindings & P2_LEFT_RED   = Config::ConfigManager::instance ().getKeyBindings ().p2_left_red();
+static const Keybindings & P2_RIGHT_RED  = Config::ConfigManager::instance ().getKeyBindings ().p2_right_red();
+static const Keybindings & P2_RIGHT_BLUE = Config::ConfigManager::instance ().getKeyBindings ().p2_right_blue();
 
 const int exitWait  = 100;
 int exited          = 0;
@@ -50,7 +52,16 @@ bool updateByCoin   = false;
 HWND windowHandle   = nullptr;
 float axisThreshold = 0.6f;
 u8 inputState       = 1 | (1 << 2);
-bool globalKeyboard = false;
+bool globalKeyboard = Config::ConfigManager::instance ().getControllerConfig ().global_keyboard;
+bool waitAll = false;
+short drumWaitPeriod = Config::ConfigManager::instance ().getControllerConfig ().wait_period;
+bool analogInput = Config::ConfigManager::instance ().getControllerConfig ().analog_input;
+u16 buttonWaitPeriod[] = { 0, 0 };
+std::queue<u8> buttonQueue[] = { {}, {} };
+bool valueStates[] = {false, false, false, false, false, false, false, false};
+const Keybindings *analogButtons[] = {
+    &P1_LEFT_BLUE, &P1_LEFT_RED, &P1_RIGHT_RED, &P1_RIGHT_BLUE, &P2_LEFT_BLUE, &P2_LEFT_RED, &P2_RIGHT_RED, &P2_RIGHT_BLUE
+};
 
 namespace bnusio {
 HMODULE bnusioOriginal = LoadLibrary ("bnusio_original.dll");
@@ -136,10 +147,9 @@ BNUSIO_EXPORT (u16, bnusio_GetService, i32 a1) {
 }
 }
 
-bool analogInput = false;
 SDLAxis analogBindings[] = {
-    SDL_AXIS_LEFT_LEFT,  SDL_AXIS_LEFT_RIGHT,  SDL_AXIS_LEFT_DOWN,  SDL_AXIS_LEFT_UP,  // P1: LB, LR, RR, RB
-    SDL_AXIS_RIGHT_LEFT, SDL_AXIS_RIGHT_RIGHT, SDL_AXIS_RIGHT_DOWN, SDL_AXIS_RIGHT_UP, // P2: LB, LR, RR, RB
+    SDLAxis::SDL_AXIS_LEFT_LEFT, SDLAxis::SDL_AXIS_LEFT_RIGHT, SDLAxis::SDL_AXIS_LEFT_DOWN, SDLAxis::SDL_AXIS_LEFT_UP,  // P1: LB, LR, RR, RB
+    SDLAxis::SDL_AXIS_RIGHT_LEFT, SDLAxis::SDL_AXIS_RIGHT_RIGHT, SDLAxis::SDL_AXIS_RIGHT_DOWN, SDLAxis::SDL_AXIS_RIGHT_UP, // P2: LB, LR, RR, RB
 };
 u16 __fastcall
 AnalogInputAxis (const u8 which) {
@@ -147,14 +157,6 @@ AnalogInputAxis (const u8 which) {
     return analogIn > 100 ? analogIn : 0;
 }
 
-bool waitAll = false;
-short drumWaitPeriod = 0;
-u16 buttonWaitPeriod[] = { 0, 0 };
-std::queue<u8> buttonQueue[] = { {}, {} };
-bool valueStates[] = {false, false, false, false, false, false, false, false};
-Keybindings *analogButtons[] = {
-    &P1_LEFT_BLUE, &P1_LEFT_RED, &P1_RIGHT_RED, &P1_RIGHT_BLUE, &P2_LEFT_BLUE, &P2_LEFT_RED, &P2_RIGHT_RED, &P2_RIGHT_BLUE
-};
 u16 __fastcall
 AnalogInputWaitPeriod (const u8 which) {
     const auto button = analogButtons[which];
@@ -215,75 +217,26 @@ AnalogInputSimple (const u8 which) {
 
 void
 Init () {
-    SetKeyboardButtons ();
-
     int fpsLimit = 0;
 
-    const auto configPath = std::filesystem::current_path () / "config.toml";
-    const std::unique_ptr<toml_table_t, void (*) (toml_table_t *)> config_ptr (openConfig (configPath), toml_free);
-    if (config_ptr) {
-        const toml_table_t *config = config_ptr.get ();
-        if (const auto controller = openConfigSection (config, "controller")) {
-            drumWaitPeriod   = static_cast<short> (readConfigInt (controller, "wait_period", drumWaitPeriod));
-            analogInput      = readConfigBool (controller, "analog_input", analogInput);
-            globalKeyboard   = readConfigBool (controller, "global_keyboard", globalKeyboard);
-        }
-        // auto graphics = openConfigSection (config, "graphics");
-        // if (graphics) {
-        //     fpsLimit = (int)readConfigInt (graphics, "fpslimit", fpsLimit);
-        // }
-    }
     updateByCoin = fpsLimit == 0;
     // if (updateByCoin) {
     //     LogMessage (LogLevel::INFO, "fpsLimit is set to 0, bnusio::Update() will invoke in getCoin callback");
     // }
 
     if (analogInput) {
-        LogMessage (LogLevel::WARN, "[Analog Type] Axis: All the keyboard drum inputs have been disabled");
+        LogMessage (LogLevel::WARN, "Using Axis AnalogIn: All the keyboard drum inputs have been disabled");
         analogMethod = AnalogInputAxis;
     } else if (drumWaitPeriod > 0) {
-        LogMessage (LogLevel::WARN, "[Analog Type] WaitPeriod: Fast input might be queued");
+        LogMessage (LogLevel::WARN, "Using WaitPeriod AnalogIn: Fast input might be queued");
         analogMethod = AnalogInputWaitPeriod;
-    } else if (drumWaitPeriod == 0) {
-        LogMessage (LogLevel::INFO, "[Analog Type] Cooldown: Fastest and original input");
-        analogMethod = AnalogInputCooldown;
+    // } else if (drumWaitPeriod == 0) {
+    //     LogMessage (LogLevel::INFO, "Using Cooldown AnalogIn: Fastest and original input");
+    //     analogMethod = AnalogInputCooldown;
     } else {
-        LogMessage (LogLevel::INFO, "[Analog Type] Simple: Fastest and original input");
+        LogMessage (LogLevel::INFO, "Using Simple AnalogIn: Fastest and original input");
         analogMethod = AnalogInputSimple;
     }
-
-    const auto keyConfigPath = std::filesystem::current_path () / "keyconfig.toml";
-    const std::unique_ptr<toml_table_t, void (*) (toml_table_t *)> keyConfig_ptr (openConfig (keyConfigPath), toml_free);
-    if (keyConfig_ptr) {
-        inputState = 0;
-        if (analogInput) inputState |= (1 << 2);
-        const toml_table_t *keyConfig = keyConfig_ptr.get ();
-        SetConfigValue (keyConfig, "EXIT", &EXIT, &inputState);
-
-        SetConfigValue (keyConfig, "TEST", &TEST, &inputState);
-        SetConfigValue (keyConfig, "SERVICE", &SERVICE, &inputState);
-        SetConfigValue (keyConfig, "DEBUG_UP", &DEBUG_UP, &inputState);
-        SetConfigValue (keyConfig, "DEBUG_DOWN", &DEBUG_DOWN, &inputState);
-        SetConfigValue (keyConfig, "DEBUG_ENTER", &DEBUG_ENTER, &inputState);
-
-        SetConfigValue (keyConfig, "COIN_ADD", &COIN_ADD, &inputState);
-        SetConfigValue (keyConfig, "CARD_INSERT_1", &CARD_INSERT_1, &inputState);
-        SetConfigValue (keyConfig, "CARD_INSERT_2", &CARD_INSERT_2, &inputState);
-        SetConfigValue (keyConfig, "QR_DATA_READ", &QR_DATA_READ, &inputState);
-        SetConfigValue (keyConfig, "QR_IMAGE_READ", &QR_IMAGE_READ, &inputState);
-
-        SetConfigValue (keyConfig, "P1_LEFT_BLUE", &P1_LEFT_BLUE, &inputState);
-        SetConfigValue (keyConfig, "P1_LEFT_RED", &P1_LEFT_RED, &inputState);
-        SetConfigValue (keyConfig, "P1_RIGHT_RED", &P1_RIGHT_RED, &inputState);
-        SetConfigValue (keyConfig, "P1_RIGHT_BLUE", &P1_RIGHT_BLUE, &inputState);
-        SetConfigValue (keyConfig, "P2_LEFT_BLUE", &P2_LEFT_BLUE, &inputState);
-        SetConfigValue (keyConfig, "P2_LEFT_RED", &P2_LEFT_RED, &inputState);
-        SetConfigValue (keyConfig, "P2_RIGHT_RED", &P2_RIGHT_RED, &inputState);
-        SetConfigValue (keyConfig, "P2_RIGHT_BLUE", &P2_RIGHT_BLUE, &inputState);
-    }
-
-    LogMessage (LogLevel::INFO, "Finish Loading keyconfig.toml  useKeyboard={} useMouse={} useController={}",
-        (inputState & 1) ? "true" : "false", (inputState & (1 << 1)) ? "true" : "false", (inputState & (1 << 2)) ? "true" : "false");
 
     if (!emulateUsio && !exists (std::filesystem::current_path () / "bnusio_original.dll")) {
         emulateUsio = true;
@@ -291,7 +244,9 @@ Init () {
     }
 
     if (!emulateUsio && bnusioOriginal) {
-        LogMessage (LogLevel::WARN, "USIO emulation disabled");
+        LogMessage (LogLevel::WARN, "Disable USIO Emulation");
+    } else {
+        LogMessage (LogLevel::INFO, "Using USIO Emulation");
     }
 }
 
@@ -307,8 +262,12 @@ Update () {
     UpdatePoll (windowHandle);
 
     std::vector<uint8_t> buffer = {};
-    if (IsButtonTapped (COIN_ADD)) coin_count++;
-    if (IsButtonTapped (SERVICE)) service_count++;
+    if (IsButtonTapped (COIN_ADD)) {
+        coin_count++;
+    }
+    if (IsButtonTapped (SERVICE)) {
+        service_count++;
+    }
     if (IsButtonTapped (TEST)) testEnabled = !testEnabled;
     if (exited == 0 && IsButtonTapped (EXIT)) {
         LogMessage (LogLevel::INFO, "Exit by Press Exit Button!");
@@ -331,6 +290,6 @@ Update () {
 void
 Close () {
     // patches::Plugins::Exit ();
-    CleanupLogger ();
+    Logger::CleanupLogger ();
 }
 } // namespace bnusio

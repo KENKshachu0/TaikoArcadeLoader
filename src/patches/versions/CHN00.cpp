@@ -1,11 +1,12 @@
 #include "helpers.h"
 #include "../patches.h"
+#include "config.h"
 
-extern std::string chassisId;
-extern i32 xRes;
-extern i32 yRes;
-extern bool vsync;
-extern bool localFiles;
+static std::string chassisId = Config::ConfigManager::instance ().getAmauthConfig ().chassis_id.value ();
+static const i32& xRes = Config::ConfigManager::instance ().getGraphicsConfig ().res.x;
+static const i32& yRes = Config::ConfigManager::instance ().getGraphicsConfig ().res.y;
+static bool vsync = Config::ConfigManager::instance ().getGraphicsConfig ().vsync;
+static bool localFiles = Config::ConfigManager::instance ().getPatchesConfig ().local_files;
 
 namespace patches::CHN00 {
 int language = 0;
@@ -105,11 +106,11 @@ ReplaceLeaBufferAddress (const std::vector<uintptr_t> &bufferAddresses, void *ne
 void
 Init () {
     LogMessage (LogLevel::INFO, "Init CHN00 patches");
-    bool unlockSongs    = true;
-    bool fixLanguage    = false;
-    bool demoMovie      = true;
-    bool modeCollabo025 = false;
-    bool modeCollabo026 = false;
+    bool unlockSongs    = Config::ConfigManager::instance ().getPatchesConfig ().unlock_songs;
+    bool fixLanguage    = Config::ConfigManager::instance ().getPatchesConfig ().chn00.fix_language;
+    bool demoMovie      = Config::ConfigManager::instance ().getPatchesConfig ().chn00.demo_movie;
+    bool modeCollabo025 = Config::ConfigManager::instance ().getPatchesConfig ().chn00.mode_collabo025;
+    bool modeCollabo026 = Config::ConfigManager::instance ().getPatchesConfig ().chn00.mode_collabo026;
 
     haspBuffer = static_cast<u8 *> (malloc (0xD40));
     memset (haspBuffer, 0, 0xD40);
@@ -127,20 +128,6 @@ Init () {
     INSTALL_HOOK (HaspLogin);
     INSTALL_HOOK (HaspGetInfo);
     INSTALL_HOOK (HaspRead);
-
-    const auto configPath = std::filesystem::current_path () / "config.toml";
-    const std::unique_ptr<toml_table_t, void (*) (toml_table_t *)> config_ptr (openConfig (configPath), toml_free);
-    if (config_ptr) {
-        if (const auto patches = openConfigSection (config_ptr.get (), "patches")) {
-            unlockSongs = readConfigBool (patches, "unlock_songs", unlockSongs);
-            if (const auto chn00 = openConfigSection (patches, "chn00")) {
-                fixLanguage    = readConfigBool (chn00, "fix_language", fixLanguage);
-                demoMovie      = readConfigBool (chn00, "demo_movie", demoMovie);
-                modeCollabo025 = readConfigBool (chn00, "mode_collabo025", modeCollabo025);
-                modeCollabo026 = readConfigBool (chn00, "mode_collabo026", modeCollabo026);
-            }
-        }
-    }
 
     // Apply common config patch
     WRITE_MEMORY (ASLR (0x1404A4ED3), i32, xRes);

@@ -1,22 +1,22 @@
 #include <winsock2.h>
 #include "helpers.h"
 #include <iostream>
-#include <cstdio>
 #include <cstdlib>
 #include <ws2tcpip.h>
+#include "config.h"
 
 /*
  * Reference: https://gitea.tendokyu.moe/Hay1tsme/bananatools/src/branch/master/amcus/iauth.c
  * https://github.com/BroGamer4256/TaikoArcadeLoader/blob/master/plugins/amauth/dllmain.cpp
  */
 
-extern std::string server;
-extern std::string chassisId;
-extern std::string shopId;
-extern std::string gameVerNum;
-extern std::string countryCode;
-extern char fullAddress[256];
-extern char placeId[16];
+static std::string server = Config::ConfigManager::instance ().getAmauthConfig ().server;
+static std::string chassisId = Config::ConfigManager::instance ().getAmauthConfig ().chassis_id.value ();
+static std::string shopId = Config::ConfigManager::instance ().getAmauthConfig ().shop_id;
+static std::string gameVerNum = Config::ConfigManager::instance ().getAmauthConfig ().game_ver;
+static std::string countryCode = Config::ConfigManager::instance ().getAmauthConfig ().country_code;
+static std::string fullAddress = Config::ConfigManager::instance ().getAmauthConfig ().full_address();
+static std::string placeId = Config::ConfigManager::instance ().getAmauthConfig ().place_id();
 
 namespace patches::AmAuth {
 
@@ -379,10 +379,10 @@ public:
         strcpy_s (version->game_id, "SBWY");
         strcpy_s (version->game_ver, "12.20");
         strcpy_s (version->game_cd, "S121");
-        strcpy_s (version->cacfg_game_ver, gameVerNum.c_str ());
+        strcpy_s (version->cacfg_game_ver, sizeof(version->cacfg_game_ver), gameVerNum.c_str ());
         strcpy_s (version->game_board_type, "0");
         strcpy_s (version->game_board_id, "PCB");
-        strcpy_s (version->auth_url, fullAddress);
+        strcpy_s (version->auth_url, sizeof(version->auth_url), fullAddress.c_str ());
         return 0;
     }
 
@@ -392,11 +392,11 @@ public:
 
     virtual i32 IAuth_GetAuthServerResp (amcus_auth_server_resp_t *resp) {
         memset (resp, 0, sizeof (*resp));
-        strcpy_s (resp->uri, fullAddress);
-        strcpy_s (resp->host, fullAddress);
+        strcpy_s (resp->uri, sizeof(resp->uri) , fullAddress.c_str ());
+        strcpy_s (resp->host, sizeof(resp->host), fullAddress.c_str ());
 
-        strcpy_s (resp->shop_name, shopId.c_str ());
-        strcpy_s (resp->shop_nickname, shopId.c_str ());
+        strcpy_s (resp->shop_name, sizeof(resp->shop_name), shopId.c_str ());
+        strcpy_s (resp->shop_nickname, sizeof(resp->shop_nickname), shopId.c_str ());
 
         strcpy_s (resp->region0, "01035");
 
@@ -404,9 +404,9 @@ public:
         strcpy_s (resp->region_name1, "X");
         strcpy_s (resp->region_name2, "Y");
         strcpy_s (resp->region_name3, "Z");
-        strcpy_s (resp->place_id, placeId);
+        strcpy_s (resp->place_id,  sizeof(resp->place_id), placeId.c_str ());
         strcpy_s (resp->setting, "");
-        strcpy_s (resp->country, countryCode.c_str ());
+        strcpy_s (resp->country, sizeof(resp->country), countryCode.c_str ());
         strcpy_s (resp->timezone, "+0900");
         strcpy_s (resp->res_class, "PowerOnResponseVer3");
         return 0;
@@ -424,7 +424,7 @@ public:
         strcpy_s (arr->shop_name_en, sizeof (arr->shop_name_en), shopId.c_str ());
         strcpy_s (arr->shop_nickname, sizeof (arr->shop_nickname), shopId.c_str ());
         strcpy_s (arr->shop_nickname_en, sizeof (arr->shop_nickname_en), shopId.c_str ());
-        strcpy_s (arr->place_id, sizeof (arr->place_id), placeId);
+        strcpy_s (arr->place_id, sizeof (arr->place_id), placeId.c_str ());
         strcpy_s (arr->country_cd, sizeof (arr->country_cd), countryCode.c_str ());
 
         strcpy_s (arr->area0, sizeof (arr->area0), "008");
@@ -447,8 +447,8 @@ public:
 
         strcpy_s (arr->url_charge, sizeof (arr->url_charge), "http://127.0.0.1/charge/");
         strcpy_s (arr->url_file, sizeof (arr->url_file), "http://127.0.0.1/file/");
-        strcpy_s (arr->url_url1, sizeof (arr->url_url1), fullAddress);
-        strcpy_s (arr->url_url2, sizeof (arr->url_url2), fullAddress);
+        strcpy_s (arr->url_url1, sizeof (arr->url_url1), fullAddress.c_str ());
+        strcpy_s (arr->url_url2, sizeof (arr->url_url2), fullAddress.c_str ());
         strcpy_s (arr->url_url3, sizeof (arr->url_url3), "http://127.0.0.1/url3/");
         return 0;
     }
@@ -549,7 +549,7 @@ CoCreateInstanceHook (const IID *const rclsid, const LPUNKNOWN pUnkOuter, const 
 
 void
 Init () {
-    LogMessage (LogLevel::INFO, "Init AmAuth patches");
+    LogMessage (LogLevel::DEBUG, "Init AmAuth patches");
 
     auto whereCoCreateInstance = GetProcAddress (LoadLibraryW (L"ole32.dll"), "CoCreateInstance");
     originalCoCreateInstanceHook = safetyhook::create_inline ((void *)whereCoCreateInstance, CoCreateInstanceHook);

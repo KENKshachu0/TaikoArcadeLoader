@@ -1,6 +1,7 @@
 #include "constants.h"
 #include "helpers.h"
 #include "patches.h"
+#include "config.h"
 #include "../Windows/MinimumLatencyAudioClient.h"
 
 extern GameVersion gameVersion;
@@ -19,10 +20,10 @@ typedef struct nusc_init_config {
     void *wasapi_audioSes;
 } nusc_init_config_t;
 
-bool real              = true;
-bool wasapiShared      = true;
-bool asio              = false;
-std::string asioDriver;
+bool wasapiShared      = Config::ConfigManager::instance ().getAudioConfig ().wasapi_shared;
+bool asio              = Config::ConfigManager::instance ().getAudioConfig ().asio;
+std::string asioDriver = Config::ConfigManager::instance ().getAudioConfig ().asio_driver;
+bool real              = Config::ConfigManager::instance ().getAudioConfig ().real;
 
 float volumeRate       = 0.0f;
 
@@ -54,7 +55,7 @@ FAST_HOOK_DYNAMIC (u64, NuscBusVolume, u64 a1, u64 a2, float a3) {
 }
 
 void
-SetVolumeRate (float rate) {
+SetVolumeRate (const float rate) {
     volumeRate = rate;
 }
 
@@ -67,28 +68,20 @@ ReduceAudioLatency () {
     } else {
         auto properties = audioClient->GetProperties ();
         auto prop = properties.value();
-        double currentDelay = prop.minimumBufferSize * 1000.0 / prop.sampleRate;
-        double defaultDelay = prop.defaultBufferSize * 1000.0 / prop.sampleRate;
-        LogMessage (LogLevel::INFO, "Audio latency: {:.2f}ms -> {:.2f}ms", defaultDelay, currentDelay);
+        if (prop.minimumBufferSize < prop.defaultBufferSize) {
+            double currentDelay = prop.minimumBufferSize * 1000.0 / prop.sampleRate;
+            double defaultDelay = prop.defaultBufferSize * 1000.0 / prop.sampleRate;
+            LogMessage (LogLevel::INFO, "Using REAL Audio latency: {:.2f}ms -> {:.2f}ms", defaultDelay, currentDelay);
+        } else {
+            LogMessage (LogLevel::WARN, "Using REAL Audio Failed, Please Check Audio Driver!");
+        }
     }
     return 0;
 }
 
 void
 Init () {
-    LogMessage (LogLevel::INFO, "Init Audio patches");
-
-    const auto configPath = std::filesystem::current_path () / "config.toml";
-    const std::unique_ptr<toml_table_t, void (*) (toml_table_t *)> config_ptr (openConfig (configPath), toml_free);
-    if (config_ptr) {
-        if (const auto audio = openConfigSection (config_ptr.get (), "audio")) {
-            real         = readConfigBool (audio, "real", real);
-            wasapiShared = readConfigBool (audio, "wasapi_shared", wasapiShared);
-            asio         = readConfigBool (audio, "asio", asio);
-            asioDriver   = readConfigString (audio, "asio_driver", asioDriver);
-
-        }
-    }
+    LogMessage (LogLevel::DEBUG, "Init Audio patches");
 
     if (real) ReduceAudioLatency ();
 

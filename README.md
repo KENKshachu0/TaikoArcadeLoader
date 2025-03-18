@@ -34,12 +34,8 @@ version = "auto"            # Patch version
                             # | - JPN08: For use with Taiko JPN 08.18
                             # | - JPN39: For use with Taiko JPN 39.06
                             # | - CHN00: For use with Taiko CHN 00.32
-<<<<<<< HEAD
 unlock_songs = true         # Self-explanatory
 local_files = true          # Only set this to false if you're using this on a Nijiiro Cabinet, running on BNA1
-=======
-unlock_songs = true
->>>>>>> 684ee61 (Several fix & optimize)
 
 [patches.chn00]             # These patches are only available for version CHN00
 fix_language = false        # Sync test mode language to attract etc
@@ -92,7 +88,7 @@ song_no = []                # Song noes used for custom folder
 wait_period = 0             # Input interval (if using taiko drum controller, should be set to 0)
 analog_input = false        # Use analog input (you need a compatible controller, this allows playing small and big notes like on arcade cabinets)
 global_keyboard = false     # Accept keyboard input even if Taiko.exe is not foreground
-
+simple_input = false        # Simplified input handler, might decrease game laggy
 
 
 [keyboard]
@@ -105,6 +101,7 @@ enabled = false             # Replace assets from the game using a layered file 
                             # | For example if you want to edit the wordlist, add your edited version like so:
                             # | .\Data_mods\x64\datatable\wordlist.json
                             # | You can provide both unencrypted and encrypted files.
+mod_dir = "Data_mods"
 
 
 [logging]
@@ -112,12 +109,14 @@ log_level = "INFO"          # Log level, Can be either "NONE", "ERROR", "WARN", 
                             # | Keep this as low as possible (Info is usually more than enough) as more logging will slow down your game
 log_to_file = false         # Log to file, set this to true to save the logs from your last session to TaikoArcadeLoader.log
                             # |Again, if you do not have a use for this (debugging mods or whatnot), turn it off.
-log_path = "logs.log"       # Log file path (Can be both relative and absolute).
+log_method_name = true
+log_full_source = true
+log_dir = "./logs/"         # Log file path (Can be both relative and absolute).
 ```
 
 ### TestMode options (JPN39 only)
 
-TaikoArcadeLoader offers several patches to select in TestMode  
+TaikoArcadeLoader offers several patches to select in TestMode
 
 The follow options are available in "MOD MANAGER" menu:
 

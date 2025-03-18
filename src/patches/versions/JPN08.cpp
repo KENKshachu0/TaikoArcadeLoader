@@ -1,13 +1,13 @@
 #include "helpers.h"
 #include "../patches.h"
+#include "config.h"
 
 extern u64 song_data_size;
 extern void *song_data;
-extern i32 xRes;
-extern i32 yRes;
-extern bool vsync;
-extern bool localFiles;
-
+static const i32& xRes = Config::ConfigManager::instance ().getGraphicsConfig ().res.x;
+static const i32& yRes = Config::ConfigManager::instance ().getGraphicsConfig ().res.y;
+static bool vsync = Config::ConfigManager::instance ().getGraphicsConfig ().vsync;
+static bool localFiles = Config::ConfigManager::instance ().getPatchesConfig ().local_files;
 #define RDX_MOV 0x48, 0xBA
 #define R8_MOV  0x49, 0xB8
 #define GENERATE_MOV(instruction, location)                                                                                 \
@@ -52,13 +52,7 @@ ReplaceLeaBufferAddress (const std::vector<uintptr_t> &bufferAddresses, void *ne
 void
 Init () {
     LogMessage (LogLevel::INFO, "Init JPN08 patches");
-    bool unlockSongs = true;
-
-    auto configPath = std::filesystem::current_path () / "config.toml";
-    std::unique_ptr<toml_table_t, void (*) (toml_table_t *)> config_ptr (openConfig (configPath), toml_free);
-    if (config_ptr) {
-        if (auto patches = openConfigSection (config_ptr.get (), "patches")) unlockSongs = readConfigBool (patches, "unlock_songs", unlockSongs);
-    }
+    bool unlockSongs = Config::ConfigManager::instance ().getPatchesConfig ().unlock_songs;
 
     // Apply common config patch
     WRITE_MEMORY (ASLR (0x14035FC5B), i32, xRes);
