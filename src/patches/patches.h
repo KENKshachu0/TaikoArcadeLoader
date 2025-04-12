@@ -95,24 +95,25 @@ void InitCardReader (CommitCardCallback touch);
 void InitQRScanner  (CommitQrCallback scan);
 void InitQRLogin    (CommitQrLoginCallback login);
 void UpdateStatus   (size_t type, bool status);
+void UpdateScene    (SceneStatus last, SceneStatus next);
 // Plugins Loader
 void LoadPlugins    ();
 } // namespace Plugins
 namespace Scanner {
 enum class State { Disable, Ready, CopyWait };
-void Init        ();
-void Update      ();
+void Init ();
+void Update ();
 namespace Card {
 typedef int32_t (*CallbackAttach) (int32_t, int32_t, int32_t *);
 typedef void    (*CallbackTouch)  (int32_t, int32_t, uint8_t[168], uint64_t);
-void Init        ();
-void Update      ();
-bool Commit      (std::string accessCode, std::string chipId);
+void Init ();
+void Update ();
+bool Commit (std::string accessCode, std::string chipId);
 } // namespace Card
 namespace Qr {
-void Init        ();
-void Update      ();
-bool Commit      (std::vector<uint8_t> &buffer);
+void Init ();
+void Update ();
+bool Commit (std::vector<uint8_t> &buffer);
 bool CommitLogin (std::string accessCode);
 std::vector<uint8_t> &ReadQRData  (std::vector<uint8_t> &buffer);
 std::vector<uint8_t> &ReadQRImage (std::vector<uint8_t> &buffer);
@@ -135,9 +136,26 @@ typedef struct {
     std::string text;
     int fontType;
 } WordInfo;
-void Init             ();
-void SetupAccessor    (u64 appAccessor, RefDataTableManager refDataTableManager);
+void Init ();
+void SetupAccessor (u64 appAccessor, RefDataTableManager refDataTableManager);
 WordInfo *GetWordInfo (std::string &key);
-void SetWordInfo      (WordInfo *wordInfo);
+void SetWordInfo (WordInfo *wordInfo);
 }
+namespace Lua {
+typedef i64 LuaState;
+typedef int (*lua_CFunction) (LuaState L);
+void Init ();
+void Execute (std::string code);
+void RegisterMethod (std::string base, std::string methodName, std::function<lua_CFunction> method);
+void SetTop (i64 lua_State, i32 index);
+void Replace (i64 lua_State, i32 index);
+void PushCClosure (i64 lua_State, lua_CFunction func, i32 index);
+void PushBoolean (i64 lua_State, bool value);
+void PushString (i64 lua_State, std::string value);
+bool ToBoolean (i64 lua_State, i32 index);
+const char *ToLString (i64 lua_State, i32 index, size_t *size);
+} // namespace lua
+namespace StatusMonitor {
+void Init();
+} // namespace StatusMonitor
 } // namespace patches

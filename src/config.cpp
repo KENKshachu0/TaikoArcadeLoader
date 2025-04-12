@@ -149,9 +149,9 @@ ConfigManager::updateQrConfig () {
         return false;
     }
 
-    auto result = rfl::toml::read<struct qrConfig, rfl::DefaultIfMissing> (stream);
+    auto result = rfl::toml::read<struct globalConfig, rfl::DefaultIfMissing> (stream);
     if (result) {
-        config.qr = result.value ();
+        config.qr = result.value ().qr;
         return true;
     }
 

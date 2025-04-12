@@ -29,28 +29,14 @@ FAST_HOOK_DYNAMIC (void, garmc_logger_log, i64 a1, int a2, void *a3, char a4) {
 
 FUNCTION_PTR (i64, GetPlayDataManagerRef, ASLR (0x140024AC0), i64);
 
-i64 lua_State = 0;
-FAST_HOOK (i64, luaL_newstate, PROC_ADDRESS ("lua51.dll", "luaL_newstate")) { return lua_State = originalluaL_newstate.call<i64> (); }
-FUNCTION_PTR (void, lua_settop, PROC_ADDRESS ("lua51.dll", "lua_settop"), i64, i32);
-FUNCTION_PTR (void, lua_replace, PROC_ADDRESS ("lua51.dll", "lua_replace"), i64, i32);
-FUNCTION_PTR (void, lua_pushcclosure, PROC_ADDRESS ("lua51.dll", "lua_pushcclosure"), i64, i64, i32);
-FUNCTION_PTR (void, lua_pushboolean, PROC_ADDRESS ("lua51.dll", "lua_pushboolean"), i64, i32);
-FUNCTION_PTR (const char *, lua_pushstring, PROC_ADDRESS ("lua51.dll", "lua_pushstring"), i64, const char *);
-FUNCTION_PTR (i32, lua_toboolean, PROC_ADDRESS ("lua51.dll", "lua_toboolean"), i64, i32);
-FUNCTION_PTR (const char *, lua_tolstring, PROC_ADDRESS ("lua51.dll", "lua_tolstring"), u64, i32, size_t *);
-FUNCTION_PTR (i32, lua_pcall, PROC_ADDRESS ("lua51.dll", "lua_pcall"), i64, i32, i32, i32);
-FUNCTION_PTR (i32, luaL_loadstring, PROC_ADDRESS ("lua51.dll", "luaL_loadstring"), i64, const char *);
-#define LUA_MULTRET         (-1)
-#define luaL_dostring(L, s) (luaL_loadstring (L, s) || lua_pcall (L, 0, LUA_MULTRET, 0))
-
 FUNCTION_PTR (u64, RefTestModeMain, ASLR (0x1400337C0), u64);
 FUNCTION_PTR (u64, RefPlayDataManager, ASLR (0x140024AC0), u64);
 FUNCTION_PTR (i64, GetUserCount, ASLR (0x1403F1080), u64);
 
 i64
-lua_pushbool (const i64 a1, const bool val) {
-    lua_settop (a1, 0);
-    lua_pushboolean (a1, val);
+lua_pushbool (Lua::LuaState a1, const bool val) {
+    Lua::SetTop (a1, 0);
+    Lua::PushBoolean (a1, val);
     return 1;
 }
 
@@ -138,67 +124,67 @@ FAST_HOOK (i64, AvailableMode_AprilFool001, ASLR (0x1402DE5B0), i64 a1) {
     return originalAvailableMode_AprilFool001.fastcall<i64> (a1);
 }
 TestMode::Value *freezeTimer = TestMode::CreateValue (L"ModFreezeTimer");
-i64 __fastcall lua_freeze_timer (const i64 a1) {
+int lua_freeze_timer (Lua::LuaState a1) {
     LogMessage (LogLevel::HOOKS, "lua_freeze_timer was called");
     const int tournamentMode = tournmentMode->Read ();
-    if (tournamentMode == 1) return lua_pushbool (a1, true);
+    if (tournamentMode == 1) return (int)lua_pushbool (a1, true);
     const int status = freezeTimer-> Read ();
-    if (status == 1) return lua_pushbool (a1, true);
-    return lua_pushbool (a1, false);
+    if (status == 1) return (int)lua_pushbool (a1, true);
+    return (int)lua_pushbool (a1, false);
 }
 MID_HOOK (FreezeTimer, ASLR (0x14019FF51), SafetyHookContext &ctx) {
     LogMessage (LogLevel::HOOKS, "FreezeTimer was called");
     const auto a1 = ctx.rdi;
     const int v9  = static_cast<int> (ctx.rax + 1);
-    lua_pushcclosure (a1, reinterpret_cast<i64> (&lua_freeze_timer), v9);
+    Lua::PushCClosure (a1, lua_freeze_timer, v9);
     ctx.rip = ASLR (0x14019FF65);
 }
 
 void
 ExecuteSendResultData () {
-    luaL_dostring(lua_State, R"(
-    local currentGameMode = PlayDataManager.GetPlayMode()
+    Lua::Execute(R"(
+        local currentGameMode = PlayDataManager.GetPlayMode()
 
-    if currentGameMode == GameMode.kEnso then
-		if g_entryType == 0 then
-            NetAccess.SendResultData(0)
-        elseif g_entryType == 1 then
-            NetAccess.SendResultData(1)
-        else
-            NetAccess.SendResultData(0)
-            NetAccess.SendResultData(1)
+        if currentGameMode == GameMode.kEnso then
+            if g_entryType == 0 then
+                NetAccess.SendResultData(0)
+            elseif g_entryType == 1 then
+                NetAccess.SendResultData(1)
+            else
+                NetAccess.SendResultData(0)
+                NetAccess.SendResultData(1)
+            end
+        elseif currentGameMode == GameMode.kAI then
+            if g_joinSide_ == 1 then
+                NetAccess.SendAiResultData(0)
+            elseif g_joinSide_ == 2 then
+                NetAccess.SendAiResultData(1)
+            end
+        elseif currentGameMode == GameMode.kCollabo025 then
+            if g_joinSide_ == 1 then
+                NetAccess.SendCollabo025AiResultData(0)
+            elseif g_joinSide_ == 2 then
+                NetAccess.SendCollabo025AiResultData(1)
+            end
+        elseif currentGameMode == GameMode.kCollabo026 then
+            if g_joinSide_ == 1 then
+                NetAccess.SendCollabo026AiResultData(0)
+            elseif g_joinSide_ == 2 then
+                NetAccess.SendCollabo026AiResultData(1)
+            end
+        elseif currentGameMode == GameMode.kAprilFool001 then
+            if g_entryType == 0 then
+                NetAccess.SendAprilFoolResultData(0)
+            elseif g_entryType == 1 then
+                NetAccess.SendAprilFoolResultData(1)
+            else
+                NetAccess.SendAprilFoolResultData(0)
+                NetAccess.SendAprilFoolResultData(1)
+            end
         end
-	elseif currentGameMode == GameMode.kAI then
-		if g_joinSide_ == 1 then
-            NetAccess.SendAiResultData(0)
-        elseif g_joinSide_ == 2 then
-            NetAccess.SendAiResultData(1)
-        end
-	elseif currentGameMode == GameMode.kCollabo025 then
-		if g_joinSide_ == 1 then
-            NetAccess.SendCollabo025AiResultData(0)
-        elseif g_joinSide_ == 2 then
-            NetAccess.SendCollabo025AiResultData(1)
-        end
-	elseif currentGameMode == GameMode.kCollabo026 then
-		if g_joinSide_ == 1 then
-            NetAccess.SendCollabo026AiResultData(0)
-        elseif g_joinSide_ == 2 then
-            NetAccess.SendCollabo026AiResultData(1)
-        end
-	elseif currentGameMode == GameMode.kAprilFool001 then
-		if g_entryType == 0 then
-            NetAccess.SendAprilFoolResultData(0)
-        elseif g_entryType == 1 then
-            NetAccess.SendAprilFoolResultData(1)
-        else
-            NetAccess.SendAprilFoolResultData(0)
-            NetAccess.SendAprilFoolResultData(1)
-        end
-    end
 
-    QR.StartQRExecAll(SceneType.kResult)
-    )"
+        QR.StartQRExecAll(SceneType.kResult)
+        )"
     );
 }
 
@@ -340,7 +326,7 @@ Init () {
 
     // Hook to get AppAccessor and ComponentAccessor
     INSTALL_FAST_HOOK (DeviceCheck);
-    INSTALL_FAST_HOOK (luaL_newstate);
+    // INSTALL_FAST_HOOK (luaL_newstate);
     // INSTALL_FAST_HOOK (AcquireMostCompatibleDisplayMode);
 
     // Window Size

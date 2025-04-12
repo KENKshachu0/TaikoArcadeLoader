@@ -16,6 +16,7 @@ namespace patches::Plugins {
     typedef void   (*SendQRScannerEvent)  (CommitQrCallback scan);
     typedef void   (*SendQRLoginEvent)    (CommitQrLoginCallback login);
     typedef void   (*StatusChangeEvent)   (size_t type, bool status);
+    typedef void   (*SceneChangeEvent)    (SceneStatus last, SceneStatus next);
 
     std::mutex updateMutex;
     std::condition_variable updateCV;
@@ -82,6 +83,14 @@ namespace patches::Plugins {
         for (auto plugin : plugins) {
             auto event = GetProcAddress (plugin, "UpdateStatus");
             if (event) ((StatusChangeEvent)event) (type, status);
+        }
+    }
+    void
+    UpdateScene (SceneStatus last, SceneStatus next) {
+        // printWarning ("Send UpdateScene last=%d next=%d", last, next);
+        for (auto plugin : plugins) {
+            auto event = GetProcAddress (plugin, "UpdateScene");
+            if (event) ((SceneChangeEvent)event) (last, next);
         }
     }
 

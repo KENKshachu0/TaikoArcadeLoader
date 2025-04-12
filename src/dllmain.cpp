@@ -274,6 +274,7 @@ DllMain (HMODULE module, const DWORD reason, LPVOID reserved) {
         case GameVersion::CHN00: patches::CHN00::Init (); break;
         }
 
+        patches::Lua::Init ();
         patches::Scanner::Init ();
         patches::Audio::Init ();
         // patches::Dxgi::Init ();
@@ -282,6 +283,7 @@ DllMain (HMODULE module, const DWORD reason, LPVOID reserved) {
         patches::TestMode::Init ();
         patches::LayeredFs::Init ();
         // patches::UnlimitSong::Init ();
+        patches::StatusMonitor::Init ();
 
         std::chrono::duration<double> duration = std::chrono::high_resolution_clock::now() - start;
         LogMessage (LogLevel::DEBUG, "=== Finished Loading patches!");

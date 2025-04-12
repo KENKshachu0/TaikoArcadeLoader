@@ -378,6 +378,8 @@ namespace Qr {
         u16 type           = Config::ConfigManager::instance ().getQrConfig ().data.type;
         std::vector<int> songNoes = Config::ConfigManager::instance ().getQrConfig ().data.song_no;
 
+        LogMessage (LogLevel::INFO, "Read QRData, serial: {}", serial);
+
         buffer.clear ();
 
         std::vector<uint8_t> header = { 0x53, 0x31, 0x32, 0x00, 0x00, 0xFF, 0xFF, (uint8_t)serial.size (), 0x01, 0x00 };
@@ -399,6 +401,8 @@ namespace Qr {
     std::vector<uint8_t> &
     ReadQRImage (std::vector<uint8_t> &buffer) {
         std::string imagePath = Config::ConfigManager::instance ().getQrConfig ().image_path;
+
+        LogMessage (LogLevel::INFO, "Read QRImage, pathpath: {}", imagePath);
 
         buffer.clear ();
         std::u8string u8PathStr (imagePath.begin (), imagePath.end ());

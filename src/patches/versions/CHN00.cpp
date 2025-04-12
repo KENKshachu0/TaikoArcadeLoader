@@ -28,14 +28,14 @@ HOOK (i32, HaspRead, PROC_ADDRESS ("hasp_windows_x64.dll", "hasp_read"), i32, i3
     return 0;
 }
 
-FUNCTION_PTR (i64, lua_settop, PROC_ADDRESS ("lua51.dll", "lua_settop"), u64, u64);
-FUNCTION_PTR (i64, lua_pushboolean, PROC_ADDRESS ("lua51.dll", "lua_pushboolean"), u64, u64);
-FUNCTION_PTR (i64, lua_pushstring, PROC_ADDRESS ("lua51.dll", "lua_pushstring"), u64, u64);
+// FUNCTION_PTR (i64, lua_settop, PROC_ADDRESS ("lua51.dll", "lua_settop"), u64, u64);
+// FUNCTION_PTR (i64, lua_pushboolean, PROC_ADDRESS ("lua51.dll", "lua_pushboolean"), u64, u64);
+// FUNCTION_PTR (i64, lua_pushstring, PROC_ADDRESS ("lua51.dll", "lua_pushstring"), u64, u64);
 
 i64
 lua_pushtrue (const i64 a1) {
-    lua_settop (a1, 0);
-    lua_pushboolean (a1, 1);
+    Lua::SetTop (a1, 0);
+    Lua::PushBoolean (a1, 1);
     return 1;
 }
 
@@ -60,14 +60,14 @@ HOOK (i64, GetLanguage, ASLR (0x140023720), i64 a1) {
 }
 HOOK (i64, GetRegionLanguage, ASLR (0x1401AC300), i64 a1) {
     LogMessage (LogLevel::HOOKS, "GetRegionLanguage was called");
-    lua_settop (a1, 0);
-    lua_pushstring (a1, reinterpret_cast<u64> (languageStr (language)));
+    Lua::SetTop (a1, 0);
+    Lua::PushString (a1, languageStr (language));
     return 1;
 }
 HOOK (i64, GetCabinetLanguage, ASLR (0x1401AF270), i64, i64 a2) {
     LogMessage (LogLevel::HOOKS, "GetCabinetLanguage was called");
-    lua_settop (a2, 0);
-    lua_pushstring (a2, reinterpret_cast<u64> (languageStr (language)));
+    Lua::SetTop (a2, 0);
+    Lua::PushString (a2, languageStr (language));
     return 1;
 }
 

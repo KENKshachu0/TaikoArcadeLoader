@@ -61,7 +61,7 @@ endif()
 # Fetch zxing-cpp
 FetchContent_Declare(
     zxing_cpp
-    URL https://github.com/zxing-cpp/zxing-cpp/archive/refs/tags/v2.2.1.zip
+    URL https://github.com/zxing-cpp/zxing-cpp/archive/refs/tags/v2.3.0.zip
 )
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(zxing_cpp)
@@ -171,6 +171,8 @@ set(SOURCES
         src/patches/testmode.cpp
         src/patches/timer.cpp
         src/patches/language.cpp
+        src/patches/lua.cpp
+        src/patches/statusmonitor.cpp
         # src/patches/unlimitsong.cpp
         src/patches/versions/JPN00.cpp
         src/patches/versions/JPN08.cpp
