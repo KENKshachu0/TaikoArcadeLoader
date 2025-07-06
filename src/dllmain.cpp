@@ -277,7 +277,7 @@ DllMain (HMODULE module, const DWORD reason, LPVOID reserved) {
         patches::Lua::Init ();
         patches::Scanner::Init ();
         patches::Audio::Init ();
-        // patches::Dxgi::Init ();
+        patches::Dxgi::Init ();
         patches::AmAuth::Init ();
         patches::Language::Init ();
         patches::TestMode::Init ();

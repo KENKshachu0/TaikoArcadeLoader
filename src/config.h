@@ -68,6 +68,7 @@ struct graphicsConfig {
     };
     resConfig res;
     bool vsync = false;
+    bool fpslimit = true;
     float model_res_rate = 1.0f;
 };
 

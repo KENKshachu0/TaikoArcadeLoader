@@ -162,8 +162,8 @@ set(SOURCES
         src/Windows/WindowsError.cpp
         src/Windows/MinimumLatencyAudioClient.cpp
         src/patches/amauth.cpp
-        # src/patches/dxgi.cpp
-        # src/patches/fpslimiter.cpp
+        src/patches/dxgi.cpp
+        src/patches/fpslimiter.cpp
         src/patches/audio.cpp
         src/patches/plugins.cpp
         src/patches/scanner.cpp

@@ -22,7 +22,7 @@ namespace Dxgi {
 void Init ();
 } // namespace Dxgi
 namespace FpsLimiter {
-void Init   (float fpsLimit);
+void Init   ();
 void Update ();
 } // namespace FpsLimiter
 namespace Audio {

@@ -36,7 +36,7 @@ res = { x = 1920, y = 1080 }
 windowed = false            # if set to false, will automatically go Fullscreen
 cursor = true               # Fullscreen will automatically hide cursor
 vsync = false               # Enable this if you are using a 120fps screen (and use "Let Application Decide" in Nvidia panel)
-# fpslimit = 0              # Temporarily disabled, limit to 120 fps in Nvidia panel instead!!!
+fpslimit = true             # Limit the game to 120fps
 model_res_rate = 1.0        # Don-Model resolution rate (currently JPN39 only)
                             # | rate <= 0: default 1280x720
                             # | rate >  0: current resolution * rate

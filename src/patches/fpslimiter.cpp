@@ -10,14 +10,13 @@ namespace patches::FpsLimiter {
 static LARGE_INTEGER PerformanceCount1;
 static LARGE_INTEGER PerformanceCount2;
 static bool bOnce1            = false;
-static double targetFrameTime = 1000.0 / 60.0;
+static double targetFrameTime = 1000.0 / 120.0;
 static double t               = 0.0;
 static u32 i                  = 0;
 
 void
-Init (const float fpsLimit) {
-    if (fpsLimit > 0) LogMessage (LogLevel::INFO, "Init Fps Limiter");
-    targetFrameTime = 1000.0 / fpsLimit;
+Init () {
+    LogMessage (LogLevel::INFO, "Init FPS Limiter");
 }
 
 void
