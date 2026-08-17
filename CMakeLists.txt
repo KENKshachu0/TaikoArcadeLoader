@@ -207,7 +207,7 @@ endif()
 add_custom_command(
     TARGET bnusio POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/bnusio.dll"
+        "$<TARGET_FILE:bnusio>"
         "${CMAKE_SOURCE_DIR}/dist/bnusio.dll"
     COMMENT "Copying bnusio.dll to dist directory"
 )
